@@ -1,22 +1,24 @@
 import React, { useState, useEffect } from "react";
 import axios from "axios";
 import * as pdfjsLib from "pdfjs-dist";
-import pdfWorker from "pdfjs-dist/build/pdf.worker.mjs?url"; // PDF Worker
+import pdfWorker from "pdfjs-dist/build/pdf.worker.mjs?url";
+import { storage, db } from "./firebase"; // ✅ Import Firebase
+import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
+import { collection, addDoc, serverTimestamp } from "firebase/firestore";
 import "./skin.css";
 
-pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorker; // Set PDF worker path
+pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorker;
 
 export default function SkinCancerDetection() {
   const [image, setImage] = useState(null);
   const [preview, setPreview] = useState(null);
   const [result, setResult] = useState(null);
-  const [advice, setAdvice] = useState(null); 
+  const [advice, setAdvice] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [ehrFile, setEhrFile] = useState(null);
   const [extractedEHRText, setExtractedEHRText] = useState("");
 
-  // Scroll to top when result or advice is updated
   useEffect(() => {
     if (result || advice) {
       window.scrollTo({ top: 0, behavior: "smooth" });
@@ -68,29 +70,48 @@ export default function SkinCancerDetection() {
       setError("Please upload an image before detecting.");
       return;
     }
-  
+
     setLoading(true);
     setError("");
     setResult(null);
     setAdvice(null);
-  
+
     const formData = new FormData();
     formData.append("file", image);
     formData.append("ehr_text", extractedEHRText || "");
-  
+
     try {
       const response = await axios.post("http://127.0.0.1:5000/predict", formData, {
         headers: { "Content-Type": "multipart/form-data" },
       });
-  
-      setResult(response.data.prediction);
-      setAdvice(response.data.advice);
-  
+
+      const prediction = response.data.prediction;
+      const followUpAdvice = response.data.advice;
+
+      setResult(prediction);
+      setAdvice(followUpAdvice);
+
+      // ✅ Upload image to Firebase Storage
+      const timestamp = Date.now();
+      const storageRef = ref(storage, `skin_detections/${timestamp}_${image.name}`);
+      await uploadBytes(storageRef, image);
+      const imageUrl = await getDownloadURL(storageRef);
+
+      // ✅ Store data in Firestore
+      await addDoc(collection(db, "skin_detections"), {
+        imageUrl,
+        prediction,
+        followUpAdvice,
+        timestamp: serverTimestamp(),
+      });
+
+      console.log("Data stored successfully in Firebase!");
+
     } catch (error) {
       console.error("Error detecting skin cancer:", error);
       setError("Something went wrong. Please try again.");
     }
-  
+
     setLoading(false);
   };
 
