@@ -1,21 +1,22 @@
-# Use an official Python image
+# Use official Python image
 FROM python:3.10
 
-# Set the working directory inside the container
+# Set working directory
 WORKDIR /app
 
-# Copy the backend code to the container
-COPY . .
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    gcc \
+    python3-dev \
+    && rm -rf /var/lib/apt/lists/*
 
-# Install dependencies
+# Copy requirements and install dependencies
+COPY requirements.txt .
 RUN pip install --upgrade pip && pip install --no-cache-dir -r requirements.txt
 
+# Copy application files
+COPY . .
 
-# Install TensorFlow separately to ensure compatibility
-RUN pip install --no-cache-dir tensorflow h5py
-
-# Expose the port your app runs on
-EXPOSE 5000
-
-# Command to run the app
-CMD ["python", "app.py"]
+# Run the app with Gunicorn
+CMD ["gunicorn", "-w", "4", "-b", "0.0.0.0:8000", "app:app"]
