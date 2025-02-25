@@ -1,5 +1,5 @@
 # Use an official Python image
-FROM python:3.9
+FROM python:3.10
 
 # Set the working directory inside the container
 WORKDIR /app
@@ -8,7 +8,8 @@ WORKDIR /app
 COPY . .
 
 # Install dependencies
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --upgrade pip && pip install --no-cache-dir -r requirements.txt
+
 
 # Install TensorFlow separately to ensure compatibility
 RUN pip install --no-cache-dir tensorflow h5py
